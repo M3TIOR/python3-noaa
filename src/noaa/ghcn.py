@@ -4,7 +4,6 @@
 #
 #
 
-from .utils import NOAADatabase, NOAADatabaseError
+from .utils import NOAADatabase, NOAADatasetError
 
-class NOAA_GHCN(NOAADatabase):
-	
+class GHCN():

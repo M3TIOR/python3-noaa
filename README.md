@@ -5,4 +5,4 @@ including managers for all of the different datasets comprised therein. This par
 features both server query and response api's and temporary file storage method's to reduce overhead.
 
 ### Database Assets:
- * NOAA's GHCN database,
+ * GHCN
