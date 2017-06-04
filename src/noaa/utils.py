@@ -11,7 +11,7 @@ from ftplib import FTP
 
 class NOAADatabase():
 	"""
-		The base class for NOAA database interactions.
+		 base class for NOAA database interactions.
 		Overrides basic connection information with correct
 		defaults, and ensure's we're managed properly
 	"""
@@ -81,7 +81,7 @@ class NOAADatabase():
 		else
 			raise NOAADatabaseError()
 
-class NOAADatabaseCache():
+class NOAACache():
 	"""
 		This class optimizes server queries by storing
 		data locally, either for an extended period or temporarily
@@ -98,56 +98,51 @@ class NOAADataset():
 
 		***CONSTRUCTOR***
 	"""
-	_connection = None  #Database
-	_cache      = None  #Cache for local file storage if desired\
 
 	# NOTE:
 	# Each folder in the NOAA's public dataset and each is refferenced
 	# individually as a seperate interface, this localdata header exists
 	# for the purpose of isolating where in a master archive this interface
 	# exists.
-	_directory  = None
+	#_directory  = None
+	#
+	# DEPRICATED
 
-	# NOTE:
+	# NOTE: _raw
 	# Data structure, dictionary w/ file name's as key and data as raw ascii
-	_raw        = None  #Ram storage
+	#_raw        = None  #Ram storage
+	#_cache      = None  #Cache storage
 
-	def __init__(self, database=None, cache=None):
-		self._connection = database
-		self._cache = cache
-	def send(self, **files, subdir=""):
-		self._connection.relinquish(files=files, dir=self.directory)
-	def get(self, facts=[], subdir=""):
-		if isInstance(cache, NOAADatabaseCache):
-			self._connection.request(dir=self.directory, facts=facts, callback=cache.raw)
-		else if cache != None:
-			raise TypeError()
-		else:
-			self._connection.request(dir=self._directory, facts=facts)
+	def __init__(self):
 
-
-	def parse(self, data):
+	def decode(self, data):
 		raise UnimplementedError
-	def encode(self, data):
+	def encode(self):
 		raise UnimplementedError
 
-class NOAADatabaseError(Exception):
+class NOAAError(Exception):
 	"""
-		The base class for database error handling.
+		The base class for error handling in this module.
 	"""
-	def __init__(self, code):
+	def __init__(self, message):
+		self.message = message
 
-
-
-class NOAADatasetError(Exception):
-	"""
-		The base class for dataset error handling.
+class ParserError(NOAAError):
 	"""
 
-def NOAAINIT(datasets, connection=None, cache=None, email=None):
 	"""
-		Quick connect to NOAA master DB with cache
+
+def QUICKCONNECT(email=None):
 	"""
+		Quick connect to NOAA master DB
+
+		Returns an ftp connection for queries and data handling
+		the working directory is preset to the /pub/data folder
+	"""
+	ftp = FTP('ftp.ncdc.noaa.gov')
+	ftp.login()
+	ftp.cwd('/pub/data')
+	return ftp
+
 
 if __name__ == "__main__":
-	test = NOAADatabase(email='jtimmerman32@gmail.com')
