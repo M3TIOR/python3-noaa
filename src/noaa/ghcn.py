@@ -5,10 +5,11 @@
 #
 
 # API imports
-from .utils import NOAADataset
+from .utils import NOAADataset, DatasetError
 
 # Python3 imports
 import datetime
+import copy			#using this for memory protection.
 
 class dly(NOAADataset):
 	"""
@@ -47,9 +48,83 @@ class dly(NOAADataset):
 	#QFLAG   =        []   # Single Character Flag / index = day
 	#SFLAG   =        []   # Single Character Flag / index = day
 
-	class m_flag():
-	class q_flag():
-	class s_flag():
+	class flag():
+		def __init__(self, value):
+			if not isinstance(value, str):
+				raise TypeError("Expected type 'str' not '%s'"%( ID.__class__.__name__,))
+			for key in self._values.keys():
+				if key == value
+					self._val = value
+					return
+			raise ValueError("%s flag '%s' does not exist"%(self._description, value))
+		def	__str__(self):
+			return self._val
+		def description(self):
+			return self._values(self._val)
+		def search(self, string):
+			ret = [] #Return value holder
+			for flag in self._values.keys():
+				if self._values(flag).find(string) or flag.find(string):
+					ret.append("%s : %s"%(flag, self._values(flag)))
+			return copy.deepcopy(ret)
+
+	class M(flag):
+		"""
+			Measurement flag
+		"""
+		_description="Measurement"
+		_values={
+			' ':"No measurement information applicable"
+			'B':"precipitation total formed from two 12-hour totals",
+			'D':"precipitation total formed from four six-hour totals",
+			'H':"represents highest or lowest hourly temperature or the average of hourly values",
+			'K':"converted from knots",
+			'L':"temperature appears to be lagged with respect to reported hour of observation",
+			'O':"converted from oktas",
+			'P':"missing presumed zero", #DSI 3200 and 3206
+			'T':"trace of precipitation, snowfall, or snow depth",
+			'W':"converted from 16-point WBAN code"
+		}
+
+	class Q(flag):
+		"""
+			Quality flag
+		"""
+		_description="Quality"
+		_values={
+			' ':"Did not fail any quality assurance check",
+			'D':"failed duplicate check",
+			'G':"failed gap check",
+			'I':"failed internal consistency check",
+			'K':"failed streak/frequent-value check",
+			'L':"failed check on length of multiday period",
+			'M':"failed megaconsistency check",
+			'N':"failed naught check",
+			'O':"failed climatological outlier check",
+			'R':"failed lagged range check",
+			'S':"failed spatial consistency check",
+			'T':"failed temporal consistency check",
+			'W':"temperature too warm for snow",
+			'X':"failed bounds check",
+			'Z':"flagged as a result of an official Datzilla investigation" # weird flag
+		}
+
+	class S(flag):
+		"""
+			Source flag
+		"""
+		_description="Source"
+		_values={
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+			'':"",
+		}
 
 	class element():
 		#NOTE: _soil_type, _depth_subcode, _weather_type
@@ -79,27 +154,30 @@ class dly(NOAADataset):
 			6:"150 centimeters",
 			7:"180 centimeters"
 		}
-		_weather_type = {
-			01:"Fog, ice fog, or freezing fog",
-			02:"Heavy fog or heaving freezing fog", #Not always distinguished from fog
-			03:"Thunder",
-			04:"Ice pellets, sleet, or snow pellets",
-			05:"Hail",
-			06:"Glaze or rime"
-			07:"Blowing obstruction, such as: Dust, volcanic ash, blowing dust, or blowing sand",
-			08:"Smoke or haze",
-			09:"Blowing or drifting snow",
-			10:"Tornado, waterspout, or funnel cloud",
-			11:"High or damaging winds",
-			12:"Blowing spray",
-			13:"Mist",
-			14:"Drizzle",
-			15:"Freezing drizzle",
-			16:"Rain",
-			17:"Freezing rain",
-			18:"Snow, snow pellets, snow grains, or ice crystals",
-			19:""
-		}
+		_weather_type = [
+			"Fog, ice fog, or freezing fog",
+			"Heavy fog or heaving freezing fog", #Not always distinguished from fog
+			"Thunder",
+			"Ice pellets, sleet, or snow pellets",
+			"Hail",
+			"Glaze or rime"
+			"Blowing obstruction, such as: Dust, volcanic ash, blowing dust, or blowing sand",
+			"Smoke or haze",
+			"Blowing or drifting snow",
+			"Tornado, waterspout, or funnel cloud",
+			"High or damaging winds",
+			"Blowing spray",
+			"Mist",
+			"Drizzle",
+			"Freezing drizzle",
+			"Rain",
+			"Freezing rain",
+			"Snow, snow pellets, snow grains, or ice crystals",
+			"Unknown source of precipitation",
+			"Rain or snow shower",
+			"Ground fog",
+			"Ice fog or freezing fog"
+		]
 		_values={
 			"PRCP":("Precipitation", "tenths of millimeters", None, None),
 			"SNOW":("Snowfall", "millimeters", None, None),
@@ -169,13 +247,16 @@ class dly(NOAADataset):
 			if not isinstance()
 			self._val=value
 		def __str__(self):
-			return self._val
+			return str(self._val)
 		def long_name(self):
 			"""
 				Returns the long name/description of the current element's code.
 				Throws an error if it doesn't yet have a code.
 			"""
-			return self._values(self._val)[0]
+			if self._val not None:
+				return self._values(self._val)[0]
+			else
+				raise DatasetError("")
 		def unit(self):
 			"""
 				Returns the unit this element's corresponding values are
@@ -210,16 +291,18 @@ class dly(NOAADataset):
 			raise ValueError("MONTH cannot be a negative number")
 		else if MONTH > 12:
 			raise ValueError("MONTH should not exceed 9999")
-		if isinstance(ELEMENT, str):
+		if not isinstance(ELEMENT, self.element):
+			if not isinstance(ELEMENT, str):
+				raise TypeError("Expected type 'str' not '%s'"%( ELEMENT.__class__.__name__,))
+		else:
 
-		else if isinstance(ELEMENT, self.element)
-			raise TypeError("Expected type 'str' not '%s'"%( ELEMENT.__class__.__name__,))
 
 
 
 	def __str__(self):
 		return self.encode()
 	def decode(self, data):
+	def encode(self):
 
 
 def search_by_station():

@@ -124,6 +124,12 @@ class NOAAError(Exception):
 	"""
 		The base class for error handling in this module.
 	"""
+	pass
+
+class DatasetError(NOAAError):
+	"""
+		Any error happening within an noaa dataset
+	"""
 	def __init__(self, message):
 		self.message = message
 
