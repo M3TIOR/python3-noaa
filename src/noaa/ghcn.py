@@ -147,6 +147,11 @@ __elements__={
 	"MDWM":("Multiday wind movement", "kilometers", None),
 	"MNPN":("Daily minimum temperature of water in an evaporation pan", "tenths of degrees^C", None),
 	"MXPN":("Daily maximum temperature of water in an evaporation pan", "tenths of degrees^C", None),
+	"NULL":("empty value placeholder", None, None),
+	#NOTE: NULL
+	# This is a custom value I'm adding in so I don't have to code in
+	# an extra exception for it. It may also aid in debugging I hope.
+	# It holds no value within the NOAA database standards.
 	"PGTM":("Peak gust time", "hours and minutes", "HHMM"),
 	"PSUN":("Daily percent of possible sunshine", "percent", None),
 	"TAVG":("Average temperature", "tenths of degrees^C", None),
@@ -200,10 +205,222 @@ __elements__.update(__subencode__(_weather_type,
 #
 #########################################################################
 
-class dly(NOAADataset):
+class DAILY(NOAADataset):
 	"""
 		The .dly Dataset given by ghcn daily interface
 	"""
+
+	#ID      =        None # The station identification code.
+	#YEAR    =        None # Year of the reccord
+	#MONTH   =        None # Month of the reccord
+	#ELEMENT =        None # COMPLICATED DX DX DX 4 Characters
+	# DAY = {
+	#	VALUE   =     []   # Five Characters ~ interger / index = day
+	#	MFLAG   =     []   # Single Character Flag / index = day
+	#	QFLAG   =     []   # Single Character Flag / index = day
+	#	SFLAG   =     []   # Single Character Flag / index = day
+	# }
+
+	def _integrity_check(self):
+		"""
+			Scan's all data structure segments for errors
+		"""
+		if not isinstance(self.id, str):
+			raise TypeError("self.id: Expected type 'str' not '%s'"%( ID.__class__.__name__))
+		if not isinstance(YEAR, int):
+			raise TypeError("Expected type 'int' not '%s'"%( YEAR.__class__.__name__))
+		if not isinstance(MONTH, int):
+			raise TypeError("Expected type 'int' not '%s'"%( MONTH.__class__.__name__,))
+		pass
+
+	class DAY():
+		"""
+			Daily values being recorded for entry
+		"""
+		class __flag__():
+			def __init__(self, value):
+				if not isinstance(value, str):
+					raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__,))
+				if value in self._values.keys():
+					self.value = value
+					return
+				raise ValueError("%s flag '%s' does not exist"%(self._description, value))
+			def	__str__(self):
+				return self.value
+			def description(self):
+				return self._values(self.value)
+			def search(self, string):
+				ret = [] #Return value holder
+				for flag in self._values.keys():
+					if self._values(flag).find(string) or flag.find(string):
+						ret.append("%s : %s"%(flag, self._values(flag)))
+				return copy.deepcopy(ret)
+
+		class M(__flag__):
+			"""
+				Measurement flag
+			"""
+			_description="Measurement"
+			_values={
+				' ':"No measurement information applicable",
+				'B':"precipitation total formed from two 12-hour totals",
+				'D':"precipitation total formed from four six-hour totals",
+				'H':"represents highest or lowest hourly temperature or the average of hourly values",
+				'K':"converted from knots",
+				'L':"temperature appears to be lagged with respect to reported hour of observation",
+				'O':"converted from oktas",
+				'P':"missing presumed zero", #DSI 3200 and 3206
+				'T':"trace of precipitation, snowfall, or snow depth",
+				'W':"converted from 16-point WBAN code"
+			}
+
+		class Q(__flag__):
+			"""
+				Quality flag
+			"""
+			_description="Quality"
+			_values={
+				' ':"Did not fail any quality assurance check",
+				'D':"failed duplicate check",
+				'G':"failed gap check",
+				'I':"failed internal consistency check",
+				'K':"failed streak/frequent-value check",
+				'L':"failed check on length of multiday period",
+				'M':"failed megaconsistency check",
+				'N':"failed naught check",
+				'O':"failed climatological outlier check",
+				'R':"failed lagged range check",
+				'S':"failed spatial consistency check",
+				'T':"failed temporal consistency check",
+				'W':"temperature too warm for snow",
+				'X':"failed bounds check",
+				'Z':"flagged as a result of an official Datzilla investigation" # weird flag
+			}
+
+		class S(__flag__):
+			"""
+				Source flag
+			"""
+			#NOTE:	When data are available for the same time from more than one source
+			#		the highest priority source is chosen according to the following
+			#		priority order (from highest to lowest):
+			#		Z,R,0,6,C,X,W,K,7,F,B,M,r,E,z,u,b,s,a,G,Q,I,A,N,T,U,H,S
+			_description="Source"
+			_values={
+				' ':"None",
+				'0':"U.S. Cooperative Summary of the Day", #NCDC DSI-3200
+				'6':"CDMP Cooperative Summary of the Day", #NCDC DSI-3206
+				'7':"U.S. Cooperative Summary of the Day -- Transmitted",
+				'A':"U.S. Automated Surface Observing System (ASOS)", #real-time data (since January 1, 2006)
+				'a':"Australian data from the Australian Bureau of Meteorology",
+				'B':"U.S. ASOS data for October 2000-December 2005", #(NCDC DSI-3211)
+				'b':"Belarus update",
+				'C':"Environment Canada",
+				'E':"European Climate Assessment and Dataset", #(Klein Tank et al., 2002)
+				'F':"U.S. Fort data",
+				'G':"Official Global Climate Observing System (GCOS) or other government-supplied data",
+				'H':"High Plains Regional Climate Center real-time data",
+				'I':"International collection", #(non U.S. data received through personal contacts)
+				'K':"U.S. Cooperative Summary of the Day data digitized from paper observer forms",
+				# 'K' --> (from 2011 to present)
+				'M':"Monthly METAR Extract", #(additional ASOS data)
+				'N':"Community Collaborative Rain, Hail,and Snow (CoCoRaHS)",
+				'Q':"Data from several African countries that had been \"quarantined\", that is, withheld from public release until permission was granted from the respective meteorological services",
+				'R':"NCEI Reference Network Database (Climate Reference Network and Regional Climate Reference Network)",
+				'r':"All-Russian Research Institute of Hydrometeorological Information-World Data Center",
+				'S':"Global Summary of the Day", #(NCDC DSI-9618)
+				#NOTE: "S" values are derived from hourly synoptic reports
+	            #      exchanged on the Global Telecommunications System (GTS).
+	            #      Daily values derived in this fashion may differ significantly
+	            #      from "true" daily data, particularly for precipitation
+	            #      (i.e., use with caution).
+				's':"China Meteorological Administration/National Meteorological Information Center/Climatic Data Center", #(http://cdc.cma.gov.cn)
+				'T':"Snowpack Telemtry (SNOTEL) data obtained from the U.S. Department of Agriculture's Natural Resources Conservation Service",
+				'U':"Remote Automatic Weather Station (RAWS) data obtained from the Western Regional Climate Center",
+				'u':"Ukraine update",
+				'W':"WBAN/ASOS Summary of the Day from NCDC's Integrated Surface Data (ISD).",
+				'X':"U.S. First-Order Summary of the Day", #(NCDC DSI-3210)
+				'Z':"Datzilla official additions or replacements",
+				'z':"Uzbekistan update",
+			}
+
+		def __init__(self, RAW=None, VALUE=-9999, MFLAG=" ", QFLAG=" ", SFLAG=" "):
+			if RAW:
+				self.value=string[0:4]
+				self.m=self.M(RAW[5]
+				self.q=self.Q(RAW[6]
+				self.s=self.S(RAW[7]
+			if VALUE == None:
+				self.value=-9999 # alternative solution to database null
+			elif isinstance(VALUE, int):
+				self.value=VALUE
+			elif isinstance(VALUE, str):
+				self.value=int(VALUE)
+		def __str__(self):
+			return self.value
+
+	class ELEMENT():
+		"""
+			Element being recorded for entry
+		"""
+		#NOTE: _soil_type, _depth_subcode, _weather_type
+		# Ok, I just want to take a second to rant about this crap.
+		# Who the hell thought it was a good idea to do this in a database?
+		# Like, I understand being a maintainer and all, and having to extrapolat`e
+		# upon what interfaces already exist for legacy support, but the amount
+		# of bullshit that goes into accounting for each of these stupid codes...
+		#
+		_values=__elements__
+		#
+		# XXX: Values passed by refference for subencoding pre-load
+		#
+
+		def __init__(self, value):
+			if not isinstance(value, str):
+				raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__))
+			if not self._values[value]:
+				raise ValueError("Code '%s' does not exist!")
+			self._val=value
+		def __str__(self):
+			return str(self.value)
+		def long_name(self):
+			"""
+				Returns the long name/description of the current element's code.
+				Throws an error if it doesn't yet have a code.
+			"""
+			if self._val != None:
+				return copy.deepcopy(self._values[self._val][0])
+			else:
+				raise DatasetError("Element missing!")
+		def unit(self):
+			"""
+				Returns the unit this element's corresponding values are
+				measured in.
+			"""
+			if self._val != None:
+				return copy.deepcopy(self._values[self._val][1])
+			else:
+				raise DatasetError("Element missing!")
+		def format(self):
+			"""
+				Returns the format of this element's corresponding values
+				if one exists.
+			"""
+			if self._val != None:
+				return copy.deepcopy(self._values[self._val][2])
+			else:
+				raise DatasetError("Element missing!")
+		def search(self, string):
+			"""
+				Fetches all codes that contain string
+			"""
+			ret = []
+			if not isinstance(string, str):
+				raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__))
+			for pair in self._values.items():
+				if pair[0].find(string) or pair[1].find(string):
+					ret.append(pair)
+			return ret
 	#------------------------------
 	#Variable   Columns   Type
 	#------------------------------
@@ -227,208 +444,51 @@ class dly(NOAADataset):
 	#QFLAG31    268-268   Character
 	#SFLAG31    269-269   Character
 	#------------------------------
-
-	#ID      =        None # The station identification code.
-	#YEAR    =        None # Year of the reccord
-	#MONTH   =        None # Month of the reccord
-	#ELEMENT =        None # COMPLICATED DX DX DX 4 Characters
-	#VALUE   =        []   # Five Characters ~ 4 byte interger / index = day
-	#MFLAG   =        []   # Single Character Flag / index = day
-	#QFLAG   =        []   # Single Character Flag / index = day
-	#SFLAG   =        []   # Single Character Flag / index = day
-
-	class __flag__():
-		def __init__(self, value):
-			if not isinstance(value, str):
-				raise TypeError("Expected type 'str' not '%s'"%( ID.__class__.__name__,))
-			for key in self._values.keys():
-				if key == value
-					self._val = value
-					return
-			raise ValueError("%s flag '%s' does not exist"%(self._description, value))
-		def	__str__(self):
-			return self._val
-		def description(self):
-			return self._values(self._val)
-		def search(self, string):
-			ret = [] #Return value holder
-			for flag in self._values.keys():
-				if self._values(flag).find(string) or flag.find(string):
-					ret.append("%s : %s"%(flag, self._values(flag)))
-			return copy.deepcopy(ret)
-
-	class M(__flag__):
-		"""
-			Measurement flag
-		"""
-		_description="Measurement"
-		_values={
-			' ':"No measurement information applicable"
-			'B':"precipitation total formed from two 12-hour totals",
-			'D':"precipitation total formed from four six-hour totals",
-			'H':"represents highest or lowest hourly temperature or the average of hourly values",
-			'K':"converted from knots",
-			'L':"temperature appears to be lagged with respect to reported hour of observation",
-			'O':"converted from oktas",
-			'P':"missing presumed zero", #DSI 3200 and 3206
-			'T':"trace of precipitation, snowfall, or snow depth",
-			'W':"converted from 16-point WBAN code"
-		}
-
-	class Q(__flag__):
-		"""
-			Quality flag
-		"""
-		_description="Quality"
-		_values={
-			' ':"Did not fail any quality assurance check",
-			'D':"failed duplicate check",
-			'G':"failed gap check",
-			'I':"failed internal consistency check",
-			'K':"failed streak/frequent-value check",
-			'L':"failed check on length of multiday period",
-			'M':"failed megaconsistency check",
-			'N':"failed naught check",
-			'O':"failed climatological outlier check",
-			'R':"failed lagged range check",
-			'S':"failed spatial consistency check",
-			'T':"failed temporal consistency check",
-			'W':"temperature too warm for snow",
-			'X':"failed bounds check",
-			'Z':"flagged as a result of an official Datzilla investigation" # weird flag
-		}
-
-	class S(__flag__):
-		"""
-			Source flag
-		"""
-		#NOTE:	When data are available for the same time from more than one source
-		#		the highest priority source is chosen according to the following
-		#		priority order (from highest to lowest):
-		#		Z,R,0,6,C,X,W,K,7,F,B,M,r,E,z,u,b,s,a,G,Q,I,A,N,T,U,H,S
-		_description="Source"
-		_values={
-			' ':"None",
-			'0':"U.S. Cooperative Summary of the Day", #NCDC DSI-3200
-			'6':"CDMP Cooperative Summary of the Day", #NCDC DSI-3206
-			'7':"U.S. Cooperative Summary of the Day -- Transmitted",
-			'A':"U.S. Automated Surface Observing System (ASOS)", #real-time data (since January 1, 2006)
-			'a':"Australian data from the Australian Bureau of Meteorology",
-			'B':"U.S. ASOS data for October 2000-December 2005", #(NCDC DSI-3211)
-			'b':"Belarus update",
-			'C':"Environment Canada",
-			'E':"European Climate Assessment and Dataset", #(Klein Tank et al., 2002)
-			'F':"U.S. Fort data",
-			'G':"Official Global Climate Observing System (GCOS) or other government-supplied data",
-			'H':"High Plains Regional Climate Center real-time data",
-			'I':"International collection", #(non U.S. data received through personal contacts)
-			'K':"U.S. Cooperative Summary of the Day data digitized from paper observer forms",
-			# 'K' --> (from 2011 to present)
-			'M':"Monthly METAR Extract", #(additional ASOS data)
-			'N':"Community Collaborative Rain, Hail,and Snow (CoCoRaHS)",
-			'Q':"Data from several African countries that had been \"quarantined\", that is, withheld from public release until permission was granted from the respective meteorological services",
-			'R':"NCEI Reference Network Database (Climate Reference Network and Regional Climate Reference Network)",
-			'r':"All-Russian Research Institute of Hydrometeorological Information-World Data Center",
-			'S':"Global Summary of the Day", #(NCDC DSI-9618)
-			#NOTE: "S" values are derived from hourly synoptic reports
-            #      exchanged on the Global Telecommunications System (GTS).
-            #      Daily values derived in this fashion may differ significantly
-            #      from "true" daily data, particularly for precipitation
-            #      (i.e., use with caution).
-			's':"China Meteorological Administration/National Meteorological Information Center/Climatic Data Center", #(http://cdc.cma.gov.cn)
-			'T':"Snowpack Telemtry (SNOTEL) data obtained from the U.S. Department of Agriculture's Natural Resources Conservation Service",
-			'U':"Remote Automatic Weather Station (RAWS) data obtained from the Western Regional Climate Center",
-			'u':"Ukraine update",
-			'W':"WBAN/ASOS Summary of the Day from NCDC's Integrated Surface Data (ISD).",
-			'X':"U.S. First-Order Summary of the Day", #(NCDC DSI-3210)
-			'Z':"Datzilla official additions or replacements",
-			'z':"Uzbekistan update",
-		}
-
-	class element():
-		#NOTE: _soil_type, _depth_subcode, _weather_type
-		# Ok, I just want to take a second to rant about this crap.
-		# Who the hell thought it was a good idea to do this in a database?
-		# Like, I understand being a maintainer and all, and having to extrapolate
-		# upon what interfaces already exist for legacy support, but the amount
-		# of bullshit that goes into accounting for each of these stupid codes...
-		#
-		_values=__elements__
-		#
-		# XXX: Values passed by refference for subencoding pre-load
-		#
-
-		def __init__(self, value):
-			if not isinstance(value, str):
-				raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__))
-			if not self._values(value):
-				raise ValueError("Code '%s' does not exist!")
-			self._val=value
-		def __str__(self):
-			return str(self._val)
-		def long_name(self):
-			"""
-				Returns the long name/description of the current element's code.
-				Throws an error if it doesn't yet have a code.
-			"""
-			if self._val not None:
-				return copy.deepcopy(self._values(self._val)[0])
-			else
-				raise DatasetError("Element missing!")
-		def unit(self):
-			"""
-				Returns the unit this element's corresponding values are
-				measured in.
-			"""
-			if self._val not None:
-				return copy.deepcopy(self._values(self._val)[1])
-			else
-				raise DatasetError("Element missing!")
-		def format(self):
-			"""
-				Returns the format of this element's corresponding values
-				if one exists.
-			"""
-			if self._val not None:
-				return copy.deepcopy(self._values(self._val)[2])
-			else
-				raise DatasetError("Element missing!")
-		def search(self, string):
-			if not isinstance(string, str):
-				raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__))
-
-	def __init__(self, ID=None, YEAR=None, MONTH=None, ELEMENT=None,
-		VALUE=[], MFLAG=[], QFLAG=[], SFLAG=[]):
-		if not isinstance(ID, str):
-			raise TypeError("Expected type 'str' not '%s'"%( ID.__class__.__name__))
-		else if ID.__len__() > 10:
-			raise ValueError("ID should not exceed 10 characters in length")
-		if not isinstance(YEAR, int):
-			raise TypeError("Expected type 'int' not '%s'"%( YEAR.__class__.__name__))
-		else if YEAR > 9999:
-			raise ValueError("YEAR should not exceed 9999")
-		else if YEAR < 0:
-			raise ValueError("YEAR cannot be a negative number")
-		if not isinstance(MONTH, int):
-			raise TypeError("Expected type 'int' not '%s'"%( MONTH.__class__.__name__,))
-		else if MONTH < 0:
-			raise ValueError("MONTH cannot be a negative number")
-		else if MONTH > 12:
-			raise ValueError("MONTH should not exceed 9999")
-		if not isinstance(ELEMENT, self.element):
-			if not isinstance(ELEMENT, str):
-				raise TypeError("Expected type 'str' not '%s'"%( ELEMENT.__class__.__name__,))
-		else:
-
-
-
-
+	def __init__(self, DAYS={}, ID="NOTDEFINED", YEAR=-999, MONTH=-1, ELEMENT="NULL", RAW=None):
+		self.id=ID
+		self.year=YEAR
+		self.month=MONTH
+		self.element=self.ELEMENT(ELEMENT)
+		self.day={x:self.DAY for x in range(1,32)}
+		self.day.update(DAYS)
+		if RAW:
+			pass
+		self._integrity_check
 	def __str__(self):
 		return self.encode()
-	def decode(self, data):
-		raise UnimplientedError()
+	def decode(self, string):
+		"""
+			Directly converts an entire .dly entry
+		"""
+		if not isinstance(string, str):
+			raise TypeError("Expected type 'str' not '%s'"%( ELEMENT.__class__.__name__,))
+		self.id=string[0:10]
+		self.year=string[11:14]
+		self.month=string[15:16]
+		self.element=self.ELEMENT(string[17:20])
+		self.day={}
+		for day in range(1,32):
+			self.day[day] = DAY(VALUE=string[20+(days*1):20+(day*5)], #Value
+				MFLAG=string[20+(days*6)],
+				QFLAG=string[20+(days*7)],
+				SFLAG=string[20+(days*7)])
+		self._integrity_check()
+		return
 	def encode(self):
-		raise UnimplientedError()
+		#NOTE:
+		#	check variable's stability here
+		self._integrity_check()
+		out = ""
+		out += self.id
+		out += self.year
+		out += self.month
+		out += str(self.element)
+		for d in self.day:
+			out += d.value
+			out += d.m.value
+			out += d.q.value
+			out += d.s.value
+		return out
 
 
 def search_by_station():
