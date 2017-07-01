@@ -5,18 +5,26 @@
 #
 
 # API imports
-from .utils import NOAADataset, DatasetError
+if __name__!="__main__":
+	from .utils import NOAADataset, DatasetError
+else:
+	#XXX: workaround for local testing
+	import utils as NOAA_utils
+	NOAADataset = NOAA_utils.NOAADataset
+	DatasetError = NOAA_utils.DatasetError
+
 
 # Python3 imports
 import datetime
-import copy			#using this for memory protection.
-import math			#optimization here
+# WE DON'T NEED MEMORY PROTECTIONS!!!
 
 #########################################################################
 # XXX: This is here to generate the sub-encoded bits of the .dly ELEMENTS
 #
 #	PLZ DO NOT DELETE
 #
+# Keep in mind this is only here so I don't have to type in a bunch of shit
+# manually lol.
 #
 # NOTE:
 #	This could used some optimization, if just a little.
@@ -201,6 +209,17 @@ __elements__.update(__subencode__(_weather_type,
 	description_prefix="Weather in the vicinity",
 	unit=None,
 	mask=[1, 3, 7, 18, 20]))
+
+__daily_mask__={
+	"ID":(0,11),
+	"YEAR":(11,15),
+	"MONTH":(15,17),
+	"ELEMENT":(17,21),
+}
+__daily_mask__.update({"VALUE":(21+(day*8),21+(day*8)+5) for day in range(0,31)})
+__daily_mask__.update({"MFLAG":(21+(day*8)+5,21+(day*8)+6) for day in range(0,31)})
+__daily_mask__.update({"QFLAG":(21+(day*8)+6,21+(day*8)+7) for day in range(0,31)})
+__daily_mask__.update({"SFLAG":(21+(day*8)+7,21+(day*8)+8) for day in range(0,31)})
 #
 #
 #########################################################################
@@ -209,7 +228,29 @@ class DAILY(NOAADataset):
 	"""
 		The .dly Dataset given by ghcn daily interface
 	"""
-
+	#------------------------------
+	#Variable   Columns   Type
+	#------------------------------
+	#ID            1-11   Character
+	#YEAR         12-15   Integer
+	#MONTH        16-17   Integer
+	#ELEMENT      18-21   Character
+	#VALUE1       22-26   Integer
+	#MFLAG1       27-27   Character
+	#QFLAG1       28-28   Character
+	#SFLAG1       29-29   Character
+	#VALUE2       30-34   Integer
+	#MFLAG2       35-35   Character
+	#QFLAG2       36-36   Character
+	#SFLAG2       37-37   Character
+	#  .           .          .
+	#  .           .          .
+	#  .           .          .
+	#VALUE31    262-266   Integer
+	#MFLAG31    267-267   Character
+	#QFLAG31    268-268   Character
+	#SFLAG31    269-269   Character
+	#------------------------------
 	#ID      =        None # The station identification code.
 	#YEAR    =        None # Year of the reccord
 	#MONTH   =        None # Month of the reccord
@@ -220,6 +261,8 @@ class DAILY(NOAADataset):
 	#	QFLAG   =     []   # Single Character Flag / index = day
 	#	SFLAG   =     []   # Single Character Flag / index = day
 	# }
+	length=269
+	mask=__daily_mask__
 
 	def _integrity_check(self):
 		"""
@@ -241,27 +284,27 @@ class DAILY(NOAADataset):
 			def __init__(self, value):
 				if not isinstance(value, str):
 					raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__,))
-				if value in self._values.keys():
+				if value in self.values.keys():
 					self.value = value
 					return
-				raise ValueError("%s flag '%s' does not exist"%(self._description, value))
+				raise ValueError("%s flag '%s' does not exist"%(self.description, value))
 			def	__str__(self):
-				return self.value
+				return str(self.value)
 			def description(self):
-				return self._values(self.value)
+				return self.values(self.value)
 			def search(self, string):
 				ret = [] #Return value holder
-				for flag in self._values.keys():
-					if self._values(flag).find(string) or flag.find(string):
-						ret.append("%s : %s"%(flag, self._values(flag)))
-				return copy.deepcopy(ret)
+				for flag in self.values.keys():
+					if self.values(flag).find(string) or flag.find(string):
+						ret.append("%s : %s"%(flag, self.values(flag)))
+				return ret
 
 		class M(__flag__):
 			"""
 				Measurement flag
 			"""
-			_description="Measurement"
-			_values={
+			description="Measurement"
+			values={
 				' ':"No measurement information applicable",
 				'B':"precipitation total formed from two 12-hour totals",
 				'D':"precipitation total formed from four six-hour totals",
@@ -278,8 +321,8 @@ class DAILY(NOAADataset):
 			"""
 				Quality flag
 			"""
-			_description="Quality"
-			_values={
+			description="Quality"
+			values={
 				' ':"Did not fail any quality assurance check",
 				'D':"failed duplicate check",
 				'G':"failed gap check",
@@ -305,8 +348,8 @@ class DAILY(NOAADataset):
 			#		the highest priority source is chosen according to the following
 			#		priority order (from highest to lowest):
 			#		Z,R,0,6,C,X,W,K,7,F,B,M,r,E,z,u,b,s,a,G,Q,I,A,N,T,U,H,S
-			_description="Source"
-			_values={
+			description="Source"
+			values={
 				' ':"None",
 				'0':"U.S. Cooperative Summary of the Day", #NCDC DSI-3200
 				'6':"CDMP Cooperative Summary of the Day", #NCDC DSI-3206
@@ -346,18 +389,29 @@ class DAILY(NOAADataset):
 
 		def __init__(self, RAW=None, VALUE=-9999, MFLAG=" ", QFLAG=" ", SFLAG=" "):
 			if RAW:
-				self.value=string[0:4]
-				self.m=self.M(RAW[5]
-				self.q=self.Q(RAW[6]
-				self.s=self.S(RAW[7]
-			if VALUE == None:
-				self.value=-9999 # alternative solution to database null
-			elif isinstance(VALUE, int):
+				self.value=int(string[0:4])
+				self.m=self.M(RAW[5])
+				self.q=self.Q(RAW[6])
+				self.s=self.S(RAW[7])
+			if isinstance(VALUE, int):
 				self.value=VALUE
 			elif isinstance(VALUE, str):
 				self.value=int(VALUE)
+			if isinstance(MFLAG, str):
+				self.m=self.M(MFLAG)
+			elif isinstance(MFLAG, self.M):
+				self.m=MFLAG
+			if isinstance(QFLAG, str):
+				self.q=self.Q(QFLAG)
+			elif isinstance(QFLAG, self.Q):
+				self.q=QFLAG
+			if isinstance(SFLAG, str):
+				self.s=self.S(SFLAG)
+			elif isinstance(SFLAG, self.S):
+				self.s=SFLAG
+			#self._integrity_check()
 		def __str__(self):
-			return self.value
+			return str(self.value)
 
 	class ELEMENT():
 		"""
@@ -370,7 +424,7 @@ class DAILY(NOAADataset):
 		# upon what interfaces already exist for legacy support, but the amount
 		# of bullshit that goes into accounting for each of these stupid codes...
 		#
-		_values=__elements__
+		values=__elements__
 		#
 		# XXX: Values passed by refference for subencoding pre-load
 		#
@@ -378,9 +432,9 @@ class DAILY(NOAADataset):
 		def __init__(self, value):
 			if not isinstance(value, str):
 				raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__))
-			if not self._values[value]:
+			if not self.values[value]:
 				raise ValueError("Code '%s' does not exist!")
-			self._val=value
+			self.value=value
 		def __str__(self):
 			return str(self.value)
 		def long_name(self):
@@ -388,8 +442,8 @@ class DAILY(NOAADataset):
 				Returns the long name/description of the current element's code.
 				Throws an error if it doesn't yet have a code.
 			"""
-			if self._val != None:
-				return copy.deepcopy(self._values[self._val][0])
+			if self.value != None:
+				return self.values[self.value][0]
 			else:
 				raise DatasetError("Element missing!")
 		def unit(self):
@@ -397,8 +451,8 @@ class DAILY(NOAADataset):
 				Returns the unit this element's corresponding values are
 				measured in.
 			"""
-			if self._val != None:
-				return copy.deepcopy(self._values[self._val][1])
+			if self.value != None:
+				return self.values[self.value][1]
 			else:
 				raise DatasetError("Element missing!")
 		def format(self):
@@ -406,8 +460,8 @@ class DAILY(NOAADataset):
 				Returns the format of this element's corresponding values
 				if one exists.
 			"""
-			if self._val != None:
-				return copy.deepcopy(self._values[self._val][2])
+			if self.value != None:
+				return self.values[self.value][2]
 			else:
 				raise DatasetError("Element missing!")
 		def search(self, string):
@@ -417,43 +471,20 @@ class DAILY(NOAADataset):
 			ret = []
 			if not isinstance(string, str):
 				raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__))
-			for pair in self._values.items():
+			for pair in self.values.items():
 				if pair[0].find(string) or pair[1].find(string):
 					ret.append(pair)
 			return ret
-	#------------------------------
-	#Variable   Columns   Type
-	#------------------------------
-	#ID            1-11   Character
-	#YEAR         12-15   Integer
-	#MONTH        16-17   Integer
-	#ELEMENT      18-21   Character
-	#VALUE1       22-26   Integer
-	#MFLAG1       27-27   Character
-	#QFLAG1       28-28   Character
-	#SFLAG1       29-29   Character
-	#VALUE2       30-34   Integer
-	#MFLAG2       35-35   Character
-	#QFLAG2       36-36   Character
-	#SFLAG2       37-37   Character
-	#  .           .          .
-	#  .           .          .
-	#  .           .          .
-	#VALUE31    262-266   Integer
-	#MFLAG31    267-267   Character
-	#QFLAG31    268-268   Character
-	#SFLAG31    269-269   Character
-	#------------------------------
 	def __init__(self, DAYS={}, ID="NOTDEFINED", YEAR=-999, MONTH=-1, ELEMENT="NULL", RAW=None):
+		if RAW:
+			return self.decode(RAW)
 		self.id=ID
 		self.year=YEAR
 		self.month=MONTH
 		self.element=self.ELEMENT(ELEMENT)
 		self.day={x:self.DAY for x in range(1,32)}
 		self.day.update(DAYS)
-		if RAW:
-			pass
-		self._integrity_check
+		#self._integrity_check()
 	def __str__(self):
 		return self.encode()
 	def decode(self, string):
@@ -461,59 +492,122 @@ class DAILY(NOAADataset):
 			Directly converts an entire .dly entry
 		"""
 		if not isinstance(string, str):
-			raise TypeError("Expected type 'str' not '%s'"%( ELEMENT.__class__.__name__,))
-		self.id=string[0:10]
-		self.year=string[11:14]
-		self.month=string[15:16]
-		self.element=self.ELEMENT(string[17:20])
+			raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__,))
+		self.id=string[0:11]
+		self.year=string[11:15]
+		self.month=string[15:17]
+		self.element=self.ELEMENT(string[17:21])
 		self.day={}
 		for day in range(1,32):
-			self.day[day] = DAY(VALUE=string[20+(days*1):20+(day*5)], #Value
-				MFLAG=string[20+(days*6)],
-				QFLAG=string[20+(days*7)],
-				SFLAG=string[20+(days*7)])
-		self._integrity_check()
+			self.day[day] = self.DAY(VALUE=string[21+((day-1)*8):21+((day-1)*8)+5], #Value
+				MFLAG=string[26+(day-1)*8], #21+5+offset
+				QFLAG=string[27+(day-1)*8], #21+6+offset
+				SFLAG=string[28+(day-1)*8]) #21+7+offset
+		#self._integrity_check()
 		return
 	def encode(self):
 		#NOTE:
 		#	check variable's stability here
-		self._integrity_check()
+		#self._integrity_check()
+		def pad(value, space):
+			return "".join([" " for x in range(value.__len__(), space)]) + str(value)
 		out = ""
 		out += self.id
-		out += self.year
-		out += self.month
+		out += str(self.year)
+		out += str(self.month)
 		out += str(self.element)
-		for d in self.day:
-			out += d.value
-			out += d.m.value
-			out += d.q.value
-			out += d.s.value
+		for d in self.day.values():
+			out += pad(str(d), 5)
+			out += str(d.m)
+			out += str(d.q)
+			out += str(d.s)
 		return out
 
+class STATION(NOAADataset):
+	#------------------------------
+	#Variable   Columns   Type
+	#------------------------------
+	#ID            1-11   Character
+	#LATITUDE     13-20   Real
+	#LONGITUDE    22-30   Real
+	#ELEVATION    32-37   Real
+	#STATE        39-40   Character
+	#NAME         42-71   Character
+	#GSN FLAG     73-75   Character
+	#HCN/CRN FLAG 77-79   Character
+	#WMO ID       81-85   Character
+	#------------------------------
+	length=85
+	mask={
+		"ID":(0,11),
+		"LATITUDE":(12,20),
+		"LONGITUDE":(21,30),
+		"ELEVATION":(31,37),
+		"STATE":(38,40),
+		"NAME":(41,71),
+		"GSN_FLAG":(72,75),
+		"HCN_CNR_FLAG":(76,79),
+		"WMO_ID":(80,85)
+	}
+	def __init__(self, ID="NOTDEFINED", LATITUDE=-9999.99,
+		LONGITUDE=-9999.99, ELEVATION=-99.99, STATE="NA",
+		NAME="-----------------------------", GSN_FLAG="  ",
+		HCN_CRN_FLAG="", WMO_ID=""):
 
+	def __str__():
+		return self.encode()
+	def decode(self, string):
+		"""
+			Directly converts an entire station entry
+		"""
+		if not isinstance(string, str):
+			raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__,))
+
+	def encode(self, string):
+		pass
+
+def search_by_mask(data, field, type):
+	ret=[]
+	l = type.length+1 # add one for delimiter
+	d = data.__len__() # done assuming __len__ scans variable for lenght
+	#remainder = d%l
+	if d%l:
+		raise ValueError("incomplete data entry: data unnexpectedly ends or wrong type")
+	for entry in range(1,int(d/l)+1):
+		ret.append(data[entry*type.mask[field][0]:entry*type.mask[field][1]])
+	return ret
+
+def search_archive_by_mask()
+	raise UnimplimentedError()
 def search_by_station():
-	raise UnimplientedError()
+	raise UnimplimentedError()
 def search_by_day():
-	raise UnimplientedError()
+	raise UnimplimentedError()
 def search_by_month():
-	raise UnimplientedError()
+	raise UnimplimentedError()
 def search_by_year():
-	raise UnimplientedError()
+	raise UnimplimentedError()
 def search_by_info(station=None, date_from=None, date_to=None, element=None):
-	raise UnimplientedError()
+	raise UnimplimentedError()
 def station_search():
-	raise UnimplientedError()
+	raise UnimplimentedError()
 
 
 # XXX:
 #	Pass-by-refference preloader cleanup
 #
-del __elements__
-del _soil_type
-del _depth_subcode
-del _weather_type
-del __subencode__
-
+del(__elements__, _soil_type, _depth_subcode, _weather_type, __subencode__)
+del(__daily_mask__)
 
 # Run tests here
 if __name__ == "__main__":
+	# NOTE: Open test Resources
+	import inspect
+	import os
+	daily_dataset_test_case = open(os.path.dirname(os.path.abspath(
+		inspect.stack()[0][1]))[0:40]+"res/ghcn_daily_gsn_test.dly")
+	stations_file_test_case = open(os.path.dirname(os.path.abspath(
+		inspect.stack()[0][1]))[0:40]+"res/ghcnd-stations.dat")
+
+	# NOTE: Begin DAILY test cases
+	#
