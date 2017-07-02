@@ -10,21 +10,10 @@ class NOAADataset():
 
 		***CONSTRUCTOR***
 	"""
-
-	# NOTE:
-	# Each folder in the NOAA's public dataset and each is refferenced
-	# individually as a seperate interface, this localdata header exists
-	# for the purpose of isolating where in a master archive this interface
-	# exists.
-	#_directory  = None
-	#
-	# DEPRICATED
-
-	# NOTE: _raw
-	# Data structure, dictionary w/ file name's as key and data as raw ascii
-	#_raw        = None  #Ram storage
-	#_cache      = None  #Cache storage
-
+	length    = False
+	mask      = False #used to optimize data queries of sets with fixed size
+	delimiter = False #denote this name for csv
+	field     = False #used as alternative to mask in csv files
 	def __init__(self):
 		pass
 	def decode(self, data):
@@ -38,12 +27,6 @@ class NOAAError(Exception):
 	"""
 	pass
 
-class DatasetError(NOAAError):
-	"""
-		Any error happening within an noaa dataset
-	"""
-	def __init__(self, message):
-		self.message = message
 
 if __name__ == "__main__":
 	pass

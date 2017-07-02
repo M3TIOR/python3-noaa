@@ -16,8 +16,11 @@ meaning we don't have to re-engineer the API, we just have to re-implement it fo
 
 ### Database Assets:
 *Unmarked is incomplete, marked is finished.*
- * [] NOAA Database (Project core)
+ * [x] NOAA Database Connection (Project core)
  * [] GHCN
+ * [] ***undecided***
+ * [] ***undecided***
+ * [] ***...***
 
 ### Afterthoughts:
 
