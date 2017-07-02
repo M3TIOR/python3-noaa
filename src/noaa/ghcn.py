@@ -17,9 +17,6 @@ else:
 import datetime
 # WE DON'T NEED MEMORY PROTECTIONS!!!
 
-# DATABASE PREFIX
-dir="ghcn"
-
 #########################################################################
 # XXX: This is here to generate the sub-encoded bits of the .dly ELEMENTS
 #

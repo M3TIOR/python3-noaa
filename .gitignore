@@ -1,1 +1,11 @@
+# M3TIOR 2017
+#
+# Python3 compilation cache lock down
+#
 __pycache__
+src/noaa/__pycache__
+tools/pycache
+#
+#
+# I really don't want to accidentally commit one of these.
+# They kinda suck... this is only here to cover my ass while I'm debugging

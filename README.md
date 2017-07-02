@@ -5,11 +5,11 @@ including managers for all of the different datasets comprised therein.
 
 ### Project Format:
 
-The sections of this API are divided as such,
-	1. primary database connections and workings are made available by the root package
-	2. each separate interface is connected to the noaa tree via a sub-module
-	3. the seperate interface sub-modules offer functions for interactions with direct data
-	4. and implement classes for custom data interaction if desired
+The sections of this API are divided as such:
+ 1. primary database connections and workings are made available by the root package
+ 2. each separate interface is connected to the noaa tree via a sub-module
+ 3. the seperate interface sub-modules offer functions for interactions with direct data
+ 4. and implement classes for custom data interaction if desired
 
 We're choosing this format because it's the most like the raw interface offered by the NOAA
 meaning we don't have to re-engineer the API, we just have to re-implement it for client side interaction.
@@ -17,10 +17,10 @@ meaning we don't have to re-engineer the API, we just have to re-implement it fo
 ### Database Assets:
 *Unmarked is incomplete, marked is finished.*
  * [x] NOAA Database Connection (Project core)
- * [] GHCN
- * [] ***undecided***
- * [] ***undecided***
- * [] ***...***
+ * [ ] GHCN
+ * [ ] ***undecided***
+ * [ ] ***undecided***
+ * [ ] ***...***
 
 ### Afterthoughts:
 
