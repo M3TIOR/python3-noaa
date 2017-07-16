@@ -4,7 +4,7 @@
 #
 #
 
-class NOAADataset():
+class Dataset():
 	"""
 		Basic dataset class for controling root data interactions
 
@@ -21,7 +21,7 @@ class NOAADataset():
 	def encode(self):
 		raise UnimplementedError()
 
-class NOAAError(Exception):
+class Error(Exception):
 	"""
 		The base class for error handling in this module.
 	"""

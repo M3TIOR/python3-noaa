@@ -1,3 +1,4 @@
+atom
 #!/usr/bin/python3
 
 # M3TIOR 2017
@@ -6,16 +7,24 @@
 
 # API imports
 if __name__!="__main__":
-	from .utils import NOAADataset
+	from .utils import Dataset
 else:
 	#XXX: workaround for local testing
-	import utils as NOAA_utils
-	NOAADataset = NOAA_utils.NOAADataset
-
+	from utils import Dataset
 
 # Python3 imports
 import datetime
 # WE DON'T NEED MEMORY PROTECTIONS!!!
+
+# SECTION: local functions
+# NOTE: _pad
+#	this local function exists only because the ghcn database has some datasets
+#	that depend on static fields to hold their values, instead of something like
+#	CSV format. This is actually great for optimization purposes, since you
+# 	can use some simple math to get your values instead of searching entire
+#	database files byte by byte.
+def _pad(value, space):
+	return str.join([" " for x in range(value.__len__(), space)]) + str(value)
 
 #########################################################################
 # XXX: This is here to generate the sub-encoded bits of the .dly ELEMENTS
@@ -216,17 +225,17 @@ __daily_mask__={
 	"ELEMENT":(17,21),
 }
 #__daily_mask__.update({"VALUE"+str(day):(21+day*8,29+day*8) for day in range(1,32)})
-__daily_mask__.update({"VALUE"+str(day):(21+(day*8),21+(day*8)+5) for day in range(0,31)})
-__daily_mask__.update({"MFLAG"+str(day):(21+(day*8)+5,21+(day*8)+6) for day in range(0,31)})
-__daily_mask__.update({"QFLAG"+str(day):(21+(day*8)+6,21+(day*8)+7) for day in range(0,31)})
-__daily_mask__.update({"SFLAG"+str(day):(21+(day*8)+7,21+(day*8)+8) for day in range(0,31)})
+__daily_mask__.update({"VALUE"+str(day):(21+(day*8),21+(day*8)+5) for day in range(1,32)})
+__daily_mask__.update({"MFLAG"+str(day):(21+(day*8)+5,21+(day*8)+6) for day in range(1,32)})
+__daily_mask__.update({"QFLAG"+str(day):(21+(day*8)+6,21+(day*8)+7) for day in range(1,32)})
+__daily_mask__.update({"SFLAG"+str(day):(21+(day*8)+7,21+(day*8)+8) for day in range(1,32)})
 #
 #
 #########################################################################
 
-
+# SECTION: API structures
 class __flag__():
-	def __init__(self, value):
+	def __init__(self, value=" "):
 		if not isinstance(value, str):
 			raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__,))
 		if value in self.values.keys():
@@ -234,7 +243,7 @@ class __flag__():
 			return
 		raise ValueError("%s flag '%s' does not exist"%(self.description, value))
 	def	__str__(self):
-		return str(self.value)
+		return self.value
 	def description(self):
 		return self.values(self.value)
 	def search(self, string):
@@ -244,11 +253,11 @@ class __flag__():
 				ret.append("%s : %s"%(flag, self.values(flag)))
 		return ret
 
+###COMPLETE###
 class MFLAG(__flag__):
 	"""
 		Measurement flag
 	"""
-	description="Measurement"
 	values={
 		' ':"No measurement information applicable",
 		'B':"precipitation total formed from two 12-hour totals",
@@ -262,11 +271,11 @@ class MFLAG(__flag__):
 		'W':"converted from 16-point WBAN code"
 	}
 
+###COMPLETE###
 class QFLAG(__flag__):
 	"""
 		Quality flag
 	"""
-	description="Quality"
 	values={
 		' ':"Did not fail any quality assurance check",
 		'D':"failed duplicate check",
@@ -293,7 +302,6 @@ class SFLAG(__flag__):
 	#		the highest priority source is chosen according to the following
 	#		priority order (from highest to lowest):
 	#		Z,R,0,6,C,X,W,K,7,F,B,M,r,E,z,u,b,s,a,G,Q,I,A,N,T,U,H,S
-	description="Source"
 	values={
 		' ':"None",
 		'0':"U.S. Cooperative Summary of the Day", #NCDC DSI-3200
@@ -350,14 +358,14 @@ class ELEMENT():
 	#NOTE: I think I may end up copying the fromat of the element class from the
 	# other file stuff since it would make things uniform
 
-	def __init__(self, value):
+	def __init__(self, value="NULL"):
 		if not isinstance(value, str):
 			raise TypeError("Expected type 'str' not '%s'"%( value.__class__.__name__))
 		if not self.values[value]:
 			raise ValueError("Code '%s' does not exist!")
 		self.value=value
 	def __str__(self):
-		return str(self.value)
+		return self.value # It's already a string dumb dumb...
 	def long_name(self):
 		"""
 			Returns the long name/description of the current element's code.
@@ -387,40 +395,52 @@ class ELEMENT():
 		if not isinstance(string, str):
 			raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__))
 		for pair in self.values.items():
-			if pair[0].find(string) or pair[1].find(string):
+			if pair[0].find(string) or pair[1][0].find(string):
 				ret.append(pair)
 		return ret
 
-class DAY():
+
+### COMPLETE ###
+class DAY(Dataset):
 	"""
 		Data value of a single day
 	"""
-	def __init__(self, raw=None, value=-9999, mflag=" ", qflag=" ", sflag=" "):
+	def __init__(self, value=-9999, mflag=" ", qflag=" ", sflag=" ", raw=None):
 		if raw:
-			self.value=int(raw[0:4])
-			self.m=MFLAG(raw[5])
-			self.q=QFLAG(raw[6])
-			self.s=SFLAG(raw[7])
-		if isinstance(value, int):
-			self.value=value
-		elif isinstance(value, str):
-			self.value=int(value)
-		if isinstance(mflag, str):
-			self.m=MFLAG(mflag)
-		elif isinstance(mflag, MFLAG):
+			raise UnimplementedError()
+			return self.decode(raw)
+		if not value:
+			self.value=-9999
+		else not isinstance(value, int):
+			self.value=int(value) #this will handle the errors by itself
+		if not mflag:
+			self.m=MFLAG()
+		elif isinstance(mflag, str):
+			self.m=MFLAG()
+	 	elif isinstance(mflag, MFLAG):
 			self.m=mflag
-		if isinstance(qflag, str):
-			self.q=QFLAG(qflag)
-		elif isinstance(qflag, QFLAG):
+		else:
+			raise TypeError("Expected type 'str' or 'MFLAG' not '%s'"%( mflag.__class__.__name__,))
+		if not qflag:
+			self.q=QFLAG()
+		elif isinstance(qflag, str):
+			self.q=QFLAG()
+	 	elif isinstance(qflag, QFLAG):
 			self.q=qflag
-		if isinstance(SFLAG, str):
-			self.s=SFLAG(sflag)
-		elif isinstance(sflag, SFLAG):
+		else:
+			raise TypeError("Expected type 'str' or 'QFLAG' not '%s'"%( qflag.__class__.__name__,))
+		if not sflag:
+			self.s=SFLAG()
+		elif isinstance(sflag, str):
+			self.s=SFLAG()
+	 	elif isinstance(sflag, SFLAG):
 			self.s=sflag
+		else:
+			raise TypeError("Expected type 'str' or 'SFLAG' not '%s'"%( sflag.__class__.__name__,))
 	def __str__(self):
 		return str(self.value)
 
-class STATION(NOAADataset):
+class STATION(Dataset):
 	#------------------------------
 	#Variable   Columns   Type
 	#------------------------------
@@ -434,7 +454,25 @@ class STATION(NOAADataset):
 	#HCN/CRN FLAG 77-79   Character
 	#WMO ID       81-85   Character
 	#------------------------------
-	length=85
+	class GSNFLAG(__flag__):
+		values={
+			" ":"non-GSN station or WMO Station number not available",
+			"GSN":"this station is part of the GCOS Surface Network (GSN)",
+		}
+	class NETFLAG(__flag__):
+		values={
+			" ":"Not a member of the U.S. Historical Climatology or U.S. Climate Reference Networks",
+			"HCN":"This stations is part of the U.S. Historical Climatology Network",
+			"CNR":"This stations is part of the U.S. Climate Reference Network or U.S. Regional Climate Network",
+		}
+	# NOTE: GSNFLAG, NETFLAG
+	#	I just want to make it very clear I didn't want to implemement these flags as such
+	#	and the only reason they have their own classes is because I wanted to keep some
+	#	level of consistency in this damn API. I keep asking myself, couldn't these be combined?
+	#	but I think the reason they aren't may be because a station can be a part of both GSN
+	#	and something else.
+	#
+	length=86 #includes whitespace
 	mask={
 		"ID":(0,11),
 		"LATITUDE":(12,20),
@@ -446,11 +484,54 @@ class STATION(NOAADataset):
 		"HCN_CNR_FLAG":(76,79),
 		"WMO_ID":(80,85)
 	}
-	def __init__(self, ID="NOTDEFINED", LATITUDE=-9999.99,
-		LONGITUDE=-9999.99, ELEVATION=-99.99, STATE="NA",
-		NAME="-----------------------------", GSN_FLAG="  ",
-		HCN_CRN_FLAG="", WMO_ID=""):
+	def __init__(self, id="NOTDEFINED", latitude=-9999.99,
+		longitude=-9999.99, elevation=-999.9, state="NA",
+		name="-----------------------------", gsn_flag=" ",
+		hcn_crn_flag=" ", wmo_id="", raw=None):
+		if raw:
+			return self.decode(raw)
+		if not id:
+			self.id="NOTDEFINED"
+		elif not isinstance(id, str):
+			self.id=str(id)
+		if not latitude:
+			latitude=-9999.99
+		elif not isinstance(latitude, float):
+			self.latitude=float(latitude)
+		if not longitude:
+			self.longitude=-9999.99
+		elif not isinstance(longitude, float):
+			self.longitude=float(longitude)
+		if not elevation:
+			self.elevation=-999.9
+		elif not isinstance(elevation, float):
+			self.elevation=float(elevation)
+		if not state:
+			self.state="NA"
+		elif not isinstance(state, str):
+			self.state=str(state)
+		if not name:
+			self.name="-----------------------------"
+		elif not isinstance(name, str):
+			self.name=str(name)
+		if not gsn_flag or not gsn_flag.strip():
+			self.gsn=self.GSNFLAG()
+		elif isinstance(gsn_flag, self.GSNFLAG):
+			self.gsn=gsn_flag
+		elif isinstance(gsn_flag, str):
+			self.gsn=self.GSNFLAG(gsn_flag)
+		else:
+			raise TypeError("Expected type 'str' or 'STATION.GSNFLAG' not '%s'"%( gsn_flag.__class__.__name__,))
+		if not hcn_crn_flag or not hcn_crn_flag.strip():
+			self.net=self.NETFLAG()
+		elif isinstance(hcn_crn_flag, self.NETFLAG):
+			self.net=hcn_crn_flag
+		elif isinstance(hcn_crn_flag, str):
+			self.net=self.NETFLAG(hcn_crn_flag)
+		else:
+			raise TypeError("Expected type 'str' or 'STATION.NETFLAG' not '%s'"%( hcn_crn_flag.__class__.__name__,))
 
+		raise UnimplementedError()
 	def __str__():
 		return self.encode()
 	def decode(self, string):
@@ -459,38 +540,71 @@ class STATION(NOAADataset):
 		"""
 		if not isinstance(string, str):
 			raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__,))
+		self.id=str(string[0,11])
+		self.latitude=float(string[12,20])
+		self.longitude=float(string[21,30])
+		self.elevation=float(string[31,37])
+		self.state=str(string[38,40])
+		self.name=str(string[41,71])
+		self.gsn=self.GSNFLAG(str(string[72,75]))
+		self.net=self.NETFLAG(str(string[76,79]))
+		self.wmo=str(string[80,85])
+	def encode(self):
+		out=_pad(self.id, 10)
+		out+="  "+_pad(self.latitude, 8)
+		out+="  "+_pad(self.longitude, 8)
+		out+="  "+_pad(self.elevation, 6)
+		out+="  "+_pad(self.state, 2)
+		out+="  "+_pad(self.name, 30)
+		out+="  "+_pad(self.gsn, 3)
+		out+="  "+_pad(self.net, 3)
+		out+="  "+_pad(self.wmo, 5)
+		return out
 
-	def encode(self, string):
-		pass
 
-
-class DAILY(NOAADataset):
+class DAILY(Dataset):
 	"""
 		The daily dataset given by ghcn daily
 	"""
-	#ID      =        None # The station identification code.
-	#YEAR    =        None # Year of the reccord
-	#MONTH   =        None # Month of the reccord
-	#ELEMENT =        None # COMPLICATED DX DX DX 4 Characters
-	# DAY = {
-	#	VALUE   =     []   # Five Characters ~ interger / index = day
-	#	MFLAG   =     []   # Single Character Flag / index = day
-	#	QFLAG   =     []   # Single Character Flag / index = day
-	#	SFLAG   =     []   # Single Character Flag / index = day
-	# }
-	length=269
+	length=270 #including newline whitespace
 	mask=__daily_mask__
 
 	def __init__(self, days={}, id="NOTDEFINED", year=-999, month=-1, element="NULL", raw=None):
 		if raw:
 			return self.decode(raw)
-		self.id=id
-		self.year=year
-		self.month=month
-		self.element=ELEMENT(element)
+		if not id:
+			self.id="NOTDEFINED"
+		elif not isinstance(id, str):
+			self.id=str(id)
+		if not year:
+			self.year=-999
+		elif not isinstance(year, int):
+			self.year=int(year)
+		if not month:
+			self.month=-1
+		elif not isinstance(month, int):
+			self.month=int(month)
+		if not element:
+			self.element=ELEMENT()
+		elif isinstance(element, str):
+			self.element=ELEMENT(element)
+		elif isinstance(element, ELEMENT):
+			self.element=element
+		else:
+			self.element=ELEMENT(value=str(element))
+		if not days:
+			days={}
+		elif not isinstance(days, dict):
+			raise TypeError("days argument expected dict not '"+days.__class__.__name__+"'")
+		for key in days.keys():
+			if not key.isdecimal():
+				raise ValueError("days must be decimal numbers; not strings, hex, octal or binary")
+			if not isinstance(days[key], DAY):
+				raise TypeError("daily values must be of type DAY not '"+days[key]__class__.__name__+"'")
+		if int(days.keys()[0]) < 1 or int(reversed(days,keys())[0]) > 31:
+			raise ValueError("day accessed outside of the monthly range (1 - 31)")
 		self.day={x:DAY() for x in range(1,32)}
 		self.day.update(days)
-		#self._integrity_check()
 	def __str__(self):
 		return self.encode()
 	def decode(self, string):
@@ -498,41 +612,34 @@ class DAILY(NOAADataset):
 			Directly converts an entire .dly entry
 		"""
 		if not isinstance(string, str):
-			raise TypeError("Expected type 'str' not '%s'"%( string.__class__.__name__,))
-		self.id=string[0:11]
-		self.year=string[11:15]
-		self.month=string[15:17]
-		self.element=ELEMENT(string[17:21])
+			raise TypeError("Expected type 'str' not '"+string.__class__.__name__+"'")
+		self.id=str(string[0:11])
+		self.year=int(string[11:15])
+		self.month=int(string[15:17])
+		self.element=ELEMENT(str(string[17:21]))
 		self.day={}
 		for day in range(1,32):
-			self.day[day] = DAY(value=string[21+((day-1)*8):21+((day-1)*8)+5], #Value
-				mflag=string[26+(day-1)*8], #21+5+offset
-				qflag=string[27+(day-1)*8], #21+6+offset
-				sflag=string[28+(day-1)*8]) #21+7+offset
+			self.day[day] = DAY(value=string[21+((day-1)*8):21+((day-1)*8)+5],
+				mflag=str(string[26+(day-1)*8]), #21+5+offset
+				qflag=str(string[27+(day-1)*8]), #21+6+offset
+				sflag=str(string[28+(day-1)*8])) #21+7+offset
 		return
 	def encode(self):
-		#NOTE:
-		#	check variable's stability here
-		#self._integrity_check()
-		def pad(value, space):
-			return "".join([" " for x in range(value.__len__(), space)]) + str(value)
-		out = ""
-		out += self.id
-		out += str(self.year)
-		out += str(self.month)
-		out += str(self.element)
+		out =  _pad(self.id, 10)
+		out += _pad(self.year, 4)
+		out += _pad(self.month, 2)
+		out += _pad(self.element, 4)
 		for d in self.day.values():
-			out += pad(str(d), 5)
+			out += _pad(d, 5)
 			out += str(d.m)
 			out += str(d.q)
 			out += str(d.s)
 		return out
 
-class YEARLY():
+class YEARLY(Dataset):
 	"""
 		the ghcn by_year dataset offered by the noaa
 	"""
-	delimiter=","
 	fields=[
 		"ID",
 		"DATE",
@@ -543,13 +650,108 @@ class YEARLY():
 		"SFLAG",
 		"TIME"
 	]
-	def __init__():
-		raise UnimplementedError()
+	def __init__(id="NOTDEFINED",
+			date=datetime.datetime.utcnow().date(),
+			element="NULL",
+			value=0,
+			mflag="",
+			qflag="",
+			sflag="",
+			obstime=datetime.datetime.utcnow().time(),
+			raw=None):
+		if raw:
+			return self.decode(raw)
+		if not id:
+			self.id=str()
+		elif not isinstance(id, str):
+			self.id=str(id)
+		if not date:
+			self.date=datetime.datetime.utcnow().date()
+		elif isinstance(date, str):
+			self.date=datetime.date(int(date[0,4]),int(date[4,6]),int(date[6,8]))
+		elif isinstance(date, datetime.date):
+			self.date=date
+		else:
+			raise TypeError("date argument expected str or datetime.date not '"+date.__class__.__name__+"'")
+		if not element:
+			self.element=ELEMENT()
+		elif isinstance(element, str):
+			self.element=ELEMENT(element)
+		elif isinstance(element, ELEMENT):
+			self.element=element
+		else:
+			self.element=ELEMENT(value=str(element))
+		if not value:
+			self.value=-9999
+		elif not isinstance(value, int):
+			self.value=int(value)
+		if not mflag:
+			self.m=MFLAG()
+		elif isinstance(mflag, str):
+			self.m=MFLAG()
+	 	elif isinstance(mflag, MFLAG):
+			self.m=mflag
+		else:
+			raise TypeError("Expected type 'str' or 'MFLAG' not '%s'"%( mflag.__class__.__name__,))
+		if not qflag:
+			self.q=QFLAG()
+		elif isinstance(qflag, str):
+			self.q=QFLAG()
+	 	elif isinstance(qflag, QFLAG):
+			self.q=qflag
+		else:
+			raise TypeError("Expected type 'str' or 'QFLAG' not '%s'"%( qflag.__class__.__name__,))
+		if not sflag:
+			self.s=SFLAG()
+		elif isinstance(sflag, str):
+			self.s=SFLAG()
+	 	elif isinstance(sflag, SFLAG):
+			self.s=sflag
+		else:
+			raise TypeError("Expected type 'str' or 'SFLAG' not '%s'"%( sflag.__class__.__name__,))
+		if not obstime:
+			self.obstime=datetime.datetime.utcnow().time()
+		elif isinstance(obstime, str):
+			self.obstime=datetime.time(int(obstime[0,2]), int(obstime[2,4]))
+		elif isinstance(obstime, datetime.time):
+			self.obstime=obstime
+		else:
+			raise TypeError("time argument expected str or datetime.time not '"+obstime.__class__.__name__+"'")
+	def __str__(self):
+		return self.encode()
+	def encode(self):
+		out=str(self.id)+","
+		out+=self.date.strftime("%Y%m%d")+","
+		out+=str(self.element)+","
+		out+=str(self.value)+","
+		out+=str(self.m)+","
+		out+=str(self.q)+","
+		out+=str(self.s)+","
+		out+=self.obstime.strftime("%H%M")+","
+		return out
+	def decode(self, string):
+		if not isinstance(string, str):
+			raise TypeError("Expected type 'str' not '"+string.__class__.__name__+"'")
+		f = string.split(",")
+		if f.__len__() < self.fields.__len__():
+			raise DatasetError("Chunk contains too many fields")
+		self.id=f[0]
+		self.date=datetime.date(f[1][0,4],f[1][4,6],f[1][6,8])
+		self.element=ELEMENT(f[2])
+		self.value=f[3]
+		self.m=MFLAG(f[4])
+		self.q=QFLAG(f[5])
+		self.s=SFLAG(f[6])
+		self.obstime=datetime.time(int(f[7][0,2]), int(f[7][2,4]))
+		return
 
+# SECTION: API functions
 def search_by_mask(data, field, type):
 	"""
 		search for field in data by mask of "type"
 	"""
+	# Don't error check dummy, the bindings are already present because you
+	# added them to the utils.Dataset constructor :P
 	if not type.mask:
 		raise DatasetError("'%s' not maskable!"%(type.__class__.__name__,))
 	ret=[]
@@ -563,12 +765,43 @@ def search_by_mask(data, field, type):
 	return ret
 def search_by_masks(data, fields, type):
 	raise UnimplementedError()
-def search_file_by_mask():
+def search_archive_by_mask():
 	raise UnimplimentedError()
-def search_file_set_by_mask():
+def search_archives_by_mask():
 	raise UnimplementedError()
+def daily_get_month():
+	raise UnimplementedError()
+def daily_get_year():
+	raise UnimplementedError()
+def daily_get_complete():
+	raise UnimplementedError()
+# SECTION: Database requests
+def database_get_month(db, month):
+	raise UnimplementedError
 def database_get_year(db, year):
 	raise UnimplementedError()
+def database_init_ghcnd(db):
+	"""
+		GHCN-Daily explicit init
+	"""
+	db.get("ghcn/daily", "ghcnd-stations.txt")
+	db.get("ghcn/daily", "ghcnd-countries.txt")
+	db.get("ghcn/daily", "ghcnd-states.txt")
+	db.get("ghcn/daily", "status.txt")
+def database_init_ghcnm(db):
+	"""
+		GHCN-Monthly explicit init
+	"""
+	raise UnimplementedError()
+def database_init_ghcn(db):
+	"""
+		GCHN complete init
+	"""
+	if not isinstance(db, core.Database)
+	db.get("ghcn/daily", "ghcnd-stations.txt")
+	db.get("ghcn/daily", "ghcnd-countries.txt")
+	db.get("ghcn/daily", "ghcnd-states.txt")
+	db.get("ghcn/daily", "status.txt")
 
 
 # XXX:
@@ -577,11 +810,12 @@ def database_get_year(db, year):
 del(__elements__, _soil_type, _depth_subcode, _weather_type, __subencode__)
 del(__daily_mask__)
 
-# Run tests here
+# SECTION: API tests
 if __name__ == "__main__":
 	# NOTE: Open test Resources
 	import inspect
 	import os
+	import __init__ as core
 	daily_dataset_test_case = open(os.path.dirname(os.path.abspath(
 		inspect.stack()[0][1]))[0:40]+"res/ghcn_daily_gsn_test.dly")
 	stations_file_test_case = open(os.path.dirname(os.path.abspath(

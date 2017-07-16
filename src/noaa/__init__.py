@@ -24,18 +24,23 @@
 
 import tempfile
 import socket
+import re
+import logging
 from ftplib import FTP
+from pathlib import Path
 
-class NOAADatabase():
+class Database():
 	"""
 		base class for NOAA database interactions.
 		Overrides basic connection information with correct
 		defaults, and ensure's we're managed properly
 	"""
-	root   = "/pub/data"   #Master Database directory
-	ftp    = None          #FTP connection
+	root      = "/pub/data"                 #Master Database directory
+	ftp       = None                        #FTP connection
+	cache     = None                        #Session Cache
+	logger    = logging.getLogger(__name__)
 
-	def __init__(self, email=''):
+	def __init__(self, email='', dir=None):
 		"""override init"""
 		self.ftp = FTP()
 		# Basically this everything the FTP init does,
@@ -50,15 +55,15 @@ class NOAADatabase():
 		# so yea, sorry for not being able to fix that, cause I'd include
 		# a variable timeout option, as extend the FTP class functionality,
 		# if it were possible anyway.
+		self.cache = tempfile.TemporaryDirectory(prefix=b'noaa.', dir=dir)
 
 	def __enter__(self):
-		"""override context"""
+		self.cache = tempfile.TemporaryDirectory(prefix=b'noaa.')
 		return self
 
-    # Context management protocol: try to quit() if active
 	def __exit__(self, *args):
-		"""override exit"""
-		self.ftp.__exit__(*args)
+		self.ftp.__exit__(args)
+		return
 
 	def connect(self, timeout=socket.SO_KEEPALIVE):
 		"""override connect"""
@@ -77,22 +82,39 @@ class NOAADatabase():
 		# make absolutely sure passive mode is turned on!
 		self.ftp.set_pasv(True)
 
-	def set_blocksize(self, blocksize):
-		self._block = blocksize
-
-	def keep_alive():
+	def keep_alive(self):
 		self.ftp.voidcmd("NOOP")
 
 	#----------------------------------------------------------------#
 	# BEGIN RESTFUL ACTIONS
 	# I do have to admit, this is powerful, but not at all robust...
 	#----------------------------------------------------------------#
-	def send():
-		raise UnimplementedError()
-	def get():
-		raise UnimplementedError()
-	def relinquish(self, *files, dir=None):
-		raise UnimplementedError() # because lazy atm...
-	def request(self, dir=None, facts=None, callback=None, blocksize=8192):
-		for f in ftp.mlsd(dir, facts):
-			self.ftp.retrbinary("RETR %s"%())
+	#def send():
+	#	raise UnimplementedError()
+	#def relinquish(self, *files, d=None):
+	#	raise UnimplementedError() # because lazy atm...
+	#
+	# Don't need these methods because we aren't sending any data.
+	# We're only going to be fetching data
+	def get(self, d, file, offset=None):
+		Path(str.join("/", [str(self.cache.name),d])).mkdir(parents=True)
+		Local  = Path(str.join("/", [str(self.cache.name),d,file]))
+		Remote = Path(str.join("/", [self.root,d,file]))
+		logger.info("Retrieving File : %s"%(str(Remote)))
+		self.ftp.retrbinary("RETR "+str(Remote), Local.open(mode='w+b').write, rest=rest)
+	def get_list(self, d, files, offset=None):
+		for f in files:
+			Path(str.join("/", [str(self.cache.name),d])).mkdir(parents=True)
+			Local  = Path(str.join("/", [str(self.cache.name),d,f]))
+			Remote = Path(str.join("/", [self.root,d,f]))
+			logger.info("Retrieving File : %s"%(str(Remote)))
+			self.ftp.retrbinary("RETR "+str(Remote), Local.open(mode='w+b').write, rest=rest)
+	def get_matching(self, d, pattern, offset=None):
+		c_pattern = re.compile(pattern)
+		for f in self.ftp.nlst(str.join("/", [self.root,d])):
+			if c_pattern.match(f):
+				Path(str.join("/", [str(self.cache.name),d])).mkdir(parents=True)
+				Local  = Path(str.join("/", [str(self.cache.name),d,f]))
+				Remote = Path(str.join("/", [self.root,d,f]))
+				logger.info("Retrieving File : %s"%(str(Remote)))
+				self.ftp.retrbinary("RETR "+str(Remote), Local.open(mode='w+b').write, rest=rest)

@@ -1,4 +1,0 @@
-#
-# So I can do testing in the area without worrying about extra commit nonsense
-#
-./__pycache__
